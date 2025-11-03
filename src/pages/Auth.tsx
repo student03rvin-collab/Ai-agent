@@ -53,7 +53,8 @@ const Auth = () => {
         }
       }
     } catch (error: any) {
-      toast.error(error.message || "Authentication failed");
+      console.error("Authentication error");
+      toast.error("Authentication failed. Please check your credentials.");
     } finally {
       setLoading(false);
     }

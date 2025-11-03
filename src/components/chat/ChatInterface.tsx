@@ -42,7 +42,11 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
         .select()
         .single();
 
-      if (convError) throw convError;
+      if (convError) {
+        console.error("Failed to initialize conversation");
+        toast.error("Unable to start conversation. Please try again.");
+        return;
+      }
 
       setConversationId(conversation.id);
 
@@ -53,12 +57,16 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
         .eq("conversation_id", conversation.id)
         .order("created_at", { ascending: true });
 
-      if (messagesError) throw messagesError;
+      if (messagesError) {
+        console.error("Failed to load conversation history");
+        toast.error("Unable to load chat history. Please refresh the page.");
+        return;
+      }
 
       setMessages((existingMessages || []) as Message[]);
     } catch (error: any) {
-      console.error("Error initializing conversation:", error);
-      toast.error("Failed to initialize chat");
+      console.error("Conversation initialization failed");
+      toast.error("Unable to start chat session. Please refresh the page.");
     }
   };
 
@@ -89,7 +97,12 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
         .select()
         .single();
 
-      if (userMsgError) throw userMsgError;
+      if (userMsgError) {
+        console.error("Failed to save message");
+        toast.error("Unable to send message. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       setMessages((prev) => [...prev, userMsg as Message]);
 
@@ -102,7 +115,12 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
         },
       });
 
-      if (aiError) throw aiError;
+      if (aiError) {
+        console.error("AI request failed");
+        toast.error("Unable to get AI response. Please try again.");
+        setLoading(false);
+        return;
+      }
 
       // Save AI response
       const { data: aiMsg, error: aiMsgError } = await supabase
@@ -115,12 +133,15 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
         .select()
         .single();
 
-      if (aiMsgError) throw aiMsgError;
+      if (aiMsgError) {
+        console.error("Failed to save AI response");
+        toast.error("Response received but couldn't be saved. Please refresh.");
+      }
 
       setMessages((prev) => [...prev, aiMsg as Message]);
     } catch (error: any) {
-      console.error("Error sending message:", error);
-      toast.error("Failed to send message");
+      console.error("Message send failed");
+      toast.error("Unable to send message. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -76,9 +76,8 @@ Respond in JSON format with this structure:
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      console.error("AI analysis request failed");
+      throw new Error("AI analysis service temporarily unavailable");
     }
 
     const aiData = await aiResponse.json();
@@ -94,7 +93,7 @@ Respond in JSON format with this structure:
       const jsonText = jsonMatch ? jsonMatch[1] : analysisText;
       analysis = JSON.parse(jsonText);
     } catch (parseError) {
-      console.error("Failed to parse AI response:", parseError);
+      console.error("Analysis response parsing failed");
       // Fallback analysis
       analysis = {
         summary: "Document uploaded successfully. Analysis details may be incomplete.",
@@ -119,8 +118,8 @@ Respond in JSON format with this structure:
       .eq("id", documentId);
 
     if (updateError) {
-      console.error("Error updating document:", updateError);
-      throw updateError;
+      console.error("Failed to save analysis results");
+      throw new Error("Unable to save analysis results");
     }
 
     console.log("Document analysis completed successfully");
@@ -132,10 +131,9 @@ Respond in JSON format with this structure:
       }
     );
   } catch (error) {
-    console.error("Error in analyze-document function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    console.error("Document analysis failed");
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Unable to analyze document. Please try again." }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },

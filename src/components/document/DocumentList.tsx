@@ -35,12 +35,16 @@ const DocumentList = ({ onSelectDocument }: DocumentListProps) => {
         .select("*")
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to load documents");
+        toast.error("Unable to load documents. Please refresh the page.");
+        return;
+      }
 
       setDocuments(data || []);
     } catch (error: any) {
-      console.error("Error loading documents:", error);
-      toast.error("Failed to load documents");
+      console.error("Document loading failed");
+      toast.error("Unable to load documents. Please refresh the page.");
     } finally {
       setLoading(false);
     }
@@ -53,13 +57,17 @@ const DocumentList = ({ onSelectDocument }: DocumentListProps) => {
         .delete()
         .eq("id", documentId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Failed to delete document");
+        toast.error("Unable to delete document. Please try again.");
+        return;
+      }
 
       toast.success("Document deleted");
       loadDocuments();
     } catch (error: any) {
-      console.error("Error deleting document:", error);
-      toast.error("Failed to delete document");
+      console.error("Document deletion failed");
+      toast.error("Unable to delete document. Please try again.");
     }
   };
 

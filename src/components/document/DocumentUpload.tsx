@@ -65,7 +65,11 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
           .select()
           .single();
 
-        if (docError) throw docError;
+        if (docError) {
+          console.error("Document upload failed");
+          toast.error("Unable to upload document. Please try again.");
+          return;
+        }
 
         // Call edge function to analyze document
         const { error: analyzeError } = await supabase.functions.invoke("analyze-document", {
@@ -76,8 +80,8 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
         });
 
         if (analyzeError) {
-          console.error("Analysis error:", analyzeError);
-          toast.warning("Document uploaded but analysis may be incomplete");
+          console.error("Document analysis failed");
+          toast.warning("Document uploaded but analysis is unavailable. Please try again later.");
         } else {
           toast.success("Document uploaded and analyzed successfully!");
         }
@@ -92,8 +96,8 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
 
       reader.readAsText(file);
     } catch (error: any) {
-      console.error("Upload error:", error);
-      toast.error(error.message || "Failed to upload document");
+      console.error("Document processing failed");
+      toast.error("Unable to process document. Please try again.");
     } finally {
       setUploading(false);
     }

@@ -29,8 +29,8 @@ Deno.serve(async (req) => {
       .limit(10);
 
     if (messagesError) {
-      console.error("Error fetching messages:", messagesError);
-      throw messagesError;
+      console.error("Failed to load conversation history");
+      throw new Error("Unable to load conversation history");
     }
 
     let systemPrompt = "You are a helpful AI assistant. Provide clear, accurate, and concise answers.";
@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
         .single();
 
       if (docError) {
-        console.error("Error fetching document:", docError);
+        console.error("Failed to load document context");
       } else if (document) {
         systemPrompt = `You are an AI assistant helping users understand and analyze their document. 
         
@@ -93,8 +93,7 @@ Answer the user's questions based on this document content. Be accurate and refe
     });
 
     if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("AI Gateway error:", aiResponse.status, errorText);
+      console.error("AI service request failed");
       
       if (aiResponse.status === 429) {
         return new Response(
@@ -110,7 +109,7 @@ Answer the user's questions based on this document content. Be accurate and refe
         );
       }
       
-      throw new Error(`AI Gateway error: ${aiResponse.status}`);
+      throw new Error("AI service temporarily unavailable");
     }
 
     const aiData = await aiResponse.json();
@@ -125,10 +124,9 @@ Answer the user's questions based on this document content. Be accurate and refe
       }
     );
   } catch (error) {
-    console.error("Error in chat function:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    console.error("Chat request failed");
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "Unable to process your request. Please try again." }),
       {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
