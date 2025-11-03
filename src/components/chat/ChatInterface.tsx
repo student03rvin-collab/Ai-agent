@@ -1,0 +1,232 @@
+import { useState, useEffect, useRef } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Card } from "@/components/ui/card";
+import { Send, Bot, User as UserIcon, Sparkles } from "lucide-react";
+import { toast } from "sonner";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  created_at: string;
+}
+
+interface ChatInterfaceProps {
+  userId: string;
+  documentId: string | null;
+}
+
+const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    initializeConversation();
+  }, [documentId]);
+
+  const initializeConversation = async () => {
+    try {
+      // Create or get conversation
+      const { data: conversation, error: convError } = await supabase
+        .from("conversations")
+        .insert({
+          user_id: userId,
+          document_id: documentId,
+          title: documentId ? "Document Chat" : "General Chat",
+        })
+        .select()
+        .single();
+
+      if (convError) throw convError;
+
+      setConversationId(conversation.id);
+
+      // Load existing messages
+      const { data: existingMessages, error: messagesError } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", conversation.id)
+        .order("created_at", { ascending: true });
+
+      if (messagesError) throw messagesError;
+
+      setMessages((existingMessages || []) as Message[]);
+    } catch (error: any) {
+      console.error("Error initializing conversation:", error);
+      toast.error("Failed to initialize chat");
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || !conversationId || loading) return;
+
+    const userMessage = input.trim();
+    setInput("");
+    setLoading(true);
+
+    try {
+      // Save user message
+      const { data: userMsg, error: userMsgError } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          role: "user",
+          content: userMessage,
+        })
+        .select()
+        .single();
+
+      if (userMsgError) throw userMsgError;
+
+      setMessages((prev) => [...prev, userMsg as Message]);
+
+      // Call AI edge function
+      const { data: aiResponse, error: aiError } = await supabase.functions.invoke("chat", {
+        body: {
+          message: userMessage,
+          conversationId,
+          documentId,
+        },
+      });
+
+      if (aiError) throw aiError;
+
+      // Save AI response
+      const { data: aiMsg, error: aiMsgError } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: conversationId,
+          role: "assistant",
+          content: aiResponse.response,
+        })
+        .select()
+        .single();
+
+      if (aiMsgError) throw aiMsgError;
+
+      setMessages((prev) => [...prev, aiMsg as Message]);
+    } catch (error: any) {
+      console.error("Error sending message:", error);
+      toast.error("Failed to send message");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
+
+  return (
+    <div className="h-[calc(100vh-16rem)] flex flex-col glass rounded-lg border border-primary/20 animate-slide-up">
+      {/* Messages area */}
+      <div className="flex-1 overflow-y-auto p-6 space-y-4">
+        {messages.length === 0 && (
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4">
+            <Sparkles className="w-16 h-16 text-primary animate-glow" />
+            <div>
+              <h3 className="text-2xl font-bold gradient-text mb-2">
+                {documentId ? "Chat with Your Document" : "Start a Conversation"}
+              </h3>
+              <p className="text-muted-foreground">
+                {documentId 
+                  ? "Ask questions about your uploaded document"
+                  : "Ask me anything or upload a document to analyze"}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex gap-3 ${
+              message.role === "user" ? "flex-row-reverse" : "flex-row"
+            }`}
+          >
+            <div
+              className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
+                message.role === "user"
+                  ? "bg-primary"
+                  : "bg-accent"
+              }`}
+            >
+              {message.role === "user" ? (
+                <UserIcon className="w-5 h-5 text-primary-foreground" />
+              ) : (
+                <Bot className="w-5 h-5 text-accent-foreground" />
+              )}
+            </div>
+
+            <Card
+              className={`max-w-[80%] p-4 ${
+                message.role === "user"
+                  ? "bg-primary/10 border-primary/30"
+                  : "bg-card border-border"
+              }`}
+            >
+              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+            </Card>
+          </div>
+        ))}
+
+        {loading && (
+          <div className="flex gap-3">
+            <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center">
+              <Bot className="w-5 h-5 text-accent-foreground animate-pulse" />
+            </div>
+            <Card className="p-4 bg-card border-border">
+              <div className="flex gap-1">
+                <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+                <div className="w-2 h-2 bg-accent rounded-full animate-bounce" style={{ animationDelay: "0.1s" }} />
+                <div className="w-2 h-2 bg-secondary rounded-full animate-bounce" style={{ animationDelay: "0.2s" }} />
+              </div>
+            </Card>
+          </div>
+        )}
+
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input area */}
+      <div className="border-t border-primary/20 p-4">
+        <div className="flex gap-2">
+          <Textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="min-h-[60px] resize-none bg-background/50 border-primary/20 focus:border-primary"
+            disabled={loading}
+          />
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || loading}
+            size="icon"
+            className="h-[60px] w-[60px] bg-primary hover:bg-primary/90"
+          >
+            <Send className="w-5 h-5" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ChatInterface;
