@@ -35,38 +35,49 @@ const analyzeRequestSchema = z.object({
 });
 
 // Content-type validation helper
-const validateContentType = (content: string, fileType: string): { valid: boolean; reason?: string } => {
-  // Check for potential malicious patterns
-  const maliciousPatterns = [
-    /<script[\s\S]*?>[\s\S]*?<\/script>/gi,  // Script tags
-    /javascript:/gi,                          // JavaScript protocol
-    /on\w+\s*=/gi,                           // Event handlers (onclick, onerror, etc.)
-    /<iframe/gi,                             // Iframes
-    /<embed/gi,                              // Embed tags
-    /<object/gi,                             // Object tags
-  ];
+const validateContentType = (content: string, fileType: string, isBase64: boolean): { valid: boolean; reason?: string } => {
+  let decodedContent = content;
+  
+  // Decode base64 if needed
+  if (isBase64) {
+    try {
+      decodedContent = atob(content);
+    } catch (e) {
+      return { valid: false, reason: "Invalid base64 encoding" };
+    }
+  }
 
-  for (const pattern of maliciousPatterns) {
-    if (pattern.test(content)) {
-      return { valid: false, reason: "Potentially malicious content detected" };
+  // Check for potential malicious patterns in text content
+  if (fileType === "text/plain" || fileType === "text/csv") {
+    const maliciousPatterns = [
+      /<script[\s\S]*?>[\s\S]*?<\/script>/gi,  // Script tags
+      /javascript:/gi,                          // JavaScript protocol
+      /on\w+\s*=/gi,                           // Event handlers
+      /<iframe/gi,                             // Iframes
+    ];
+
+    for (const pattern of maliciousPatterns) {
+      if (pattern.test(decodedContent)) {
+        return { valid: false, reason: "Potentially malicious content detected" };
+      }
     }
   }
 
   // Validate content matches expected file type
   if (fileType === "application/pdf") {
     // PDF files start with %PDF
-    if (!content.startsWith("%PDF")) {
+    if (!decodedContent.startsWith("%PDF")) {
       return { valid: false, reason: "Invalid PDF format" };
     }
   } else if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
-    // DOCX files are ZIP archives containing XML
-    if (!content.includes("PK") && !content.includes("<?xml")) {
+    // DOCX files are ZIP archives (PK signature)
+    if (!decodedContent.startsWith("PK")) {
       return { valid: false, reason: "Invalid DOCX format" };
     }
   } else if (fileType === "text/plain" || fileType === "text/csv") {
-    // Text files should not contain binary content
+    // Text files should not contain excessive binary content
     const binaryPattern = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\xFF]{10,}/;
-    if (binaryPattern.test(content)) {
+    if (binaryPattern.test(decodedContent)) {
       return { valid: false, reason: "Text file contains binary content" };
     }
   } else {
@@ -168,8 +179,12 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Determine if content is base64 encoded (binary files)
+    const isBase64 = document.file_type === "application/pdf" || 
+                     document.file_type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
     // Validate content type matches file type
-    const contentValidation = validateContentType(content, document.file_type);
+    const contentValidation = validateContentType(content, document.file_type, isBase64);
     if (!contentValidation.valid) {
       console.error("Content validation failed:", contentValidation.reason);
       
@@ -188,7 +203,32 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Decode base64 content for analysis
+    let textContent = content;
+    if (isBase64) {
+      try {
+        textContent = atob(content);
+      } catch (e) {
+        console.error("Base64 decode failed");
+        await supabase
+          .from("documents")
+          .update({ status: "failed" })
+          .eq("id", documentId);
+        
+        return new Response(
+          JSON.stringify({ error: "Invalid file encoding" }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
+
     // Prepare AI prompt for document analysis
+    // Extract readable text (first 10000 chars for analysis)
+    const contentPreview = textContent.substring(0, 10000).replace(/[^\x20-\x7E\n\r\t]/g, ' ');
+    
     const analysisPrompt = `Analyze the following document and provide:
 1. A concise summary (2-3 sentences)
 2. 5-7 key points or main ideas
@@ -197,7 +237,7 @@ Deno.serve(async (req) => {
 5. Named entities (people, organizations, locations, etc.)
 
 Document content:
-${content.substring(0, 10000)}
+${contentPreview}
 
 Respond in JSON format with this structure:
 {

@@ -108,10 +108,28 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
     setUploading(true);
 
     try {
-      // Read file content
+      // Read file content based on file type
       const reader = new FileReader();
       reader.onload = async (e) => {
-        const content = e.target?.result as string;
+        let content: string;
+        
+        // For binary files (PDF, DOCX), convert to base64
+        // For text files, read as text
+        const extension = file.name.split(".").pop()?.toLowerCase() || "";
+        
+        if (extension === "pdf" || extension === "docx") {
+          // Convert ArrayBuffer to base64 for binary files
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          const bytes = new Uint8Array(arrayBuffer);
+          let binary = "";
+          for (let i = 0; i < bytes.byteLength; i++) {
+            binary += String.fromCharCode(bytes[i]);
+          }
+          content = btoa(binary);
+        } else {
+          // Read as text for TXT and CSV
+          content = e.target?.result as string;
+        }
 
         // Create document record
         const { data: document, error: docError } = await supabase
@@ -129,13 +147,16 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
           .single();
 
         if (docError) {
-          console.error("Document upload failed");
+          console.error("Upload failed:", docError.message);
           toast.error("Unable to upload document. Please try again.");
+          setUploading(false);
           return;
         }
 
+        toast.success("Document uploaded! Analyzing content...");
+
         // Call edge function to analyze document
-        const { error: analyzeError } = await supabase.functions.invoke("analyze-document", {
+        const { data: analyzeData, error: analyzeError } = await supabase.functions.invoke("analyze-document", {
           body: {
             documentId: document.id,
             content: content,
@@ -143,10 +164,10 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
         });
 
         if (analyzeError) {
-          console.error("Document analysis failed");
-          toast.warning("Document uploaded but analysis is unavailable. Please try again later.");
+          console.error("Analysis failed:", analyzeError.message);
+          toast.warning("Document uploaded but analysis failed. You can still chat about it!");
         } else {
-          toast.success("Document uploaded and analyzed successfully!");
+          toast.success("Document analyzed successfully! Ready to chat.");
         }
 
         setFile(null);
@@ -154,14 +175,21 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
       };
 
       reader.onerror = () => {
-        throw new Error("Failed to read file");
+        console.error("File read failed");
+        toast.error("Failed to read file. Please try again.");
+        setUploading(false);
       };
 
-      reader.readAsText(file);
+      // Use appropriate reader based on file type
+      const extension = file.name.split(".").pop()?.toLowerCase() || "";
+      if (extension === "pdf" || extension === "docx") {
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.readAsText(file);
+      }
     } catch (error: any) {
-      console.error("Document processing failed");
+      console.error("Upload process failed:", error.message);
       toast.error("Unable to process document. Please try again.");
-    } finally {
       setUploading(false);
     }
   };
