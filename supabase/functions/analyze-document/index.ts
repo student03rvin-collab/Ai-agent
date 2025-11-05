@@ -6,6 +6,28 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Rate limiting: 10 document analyses per hour per user
+const rateLimits = new Map<string, {count: number, resetAt: number}>();
+const RATE_LIMIT = 10;
+const RATE_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const userLimit = rateLimits.get(userId);
+  
+  if (!userLimit || now > userLimit.resetAt) {
+    rateLimits.set(userId, { count: 1, resetAt: now + RATE_WINDOW_MS });
+    return true;
+  }
+  
+  if (userLimit.count >= RATE_LIMIT) {
+    return false;
+  }
+  
+  userLimit.count++;
+  return true;
+}
+
 // Input validation schema
 const analyzeRequestSchema = z.object({
   documentId: z.string().uuid("Invalid document ID"),
@@ -73,6 +95,42 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Initialize Supabase client with user's JWT (enforces RLS)
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    // Get user for rate limiting
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      console.error("Invalid authentication token");
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Check rate limit
+    if (!checkRateLimit(user.id)) {
+      console.warn(`Rate limit exceeded for user ${user.id}`);
+      return new Response(
+        JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+        { 
+          status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            "Content-Type": "application/json",
+            "Retry-After": "3600"
+          } 
+        }
+      );
+    }
+
     // Parse and validate request body
     const body = await req.json();
     const validationResult = analyzeRequestSchema.safeParse(body);
@@ -91,13 +149,6 @@ Deno.serve(async (req) => {
     const { documentId, content } = validationResult.data;
 
     console.log("Analyzing document:", documentId);
-
-    // Initialize Supabase client with user's JWT (enforces RLS)
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
 
     // Get document to verify ownership and file type
     const { data: document, error: docFetchError } = await supabase
