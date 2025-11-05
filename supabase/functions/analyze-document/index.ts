@@ -12,6 +12,48 @@ const analyzeRequestSchema = z.object({
   content: z.string().min(1, "Content cannot be empty").max(10 * 1024 * 1024, "Content exceeds 10MB limit"),
 });
 
+// Content-type validation helper
+const validateContentType = (content: string, fileType: string): { valid: boolean; reason?: string } => {
+  // Check for potential malicious patterns
+  const maliciousPatterns = [
+    /<script[\s\S]*?>[\s\S]*?<\/script>/gi,  // Script tags
+    /javascript:/gi,                          // JavaScript protocol
+    /on\w+\s*=/gi,                           // Event handlers (onclick, onerror, etc.)
+    /<iframe/gi,                             // Iframes
+    /<embed/gi,                              // Embed tags
+    /<object/gi,                             // Object tags
+  ];
+
+  for (const pattern of maliciousPatterns) {
+    if (pattern.test(content)) {
+      return { valid: false, reason: "Potentially malicious content detected" };
+    }
+  }
+
+  // Validate content matches expected file type
+  if (fileType === "application/pdf") {
+    // PDF files start with %PDF
+    if (!content.startsWith("%PDF")) {
+      return { valid: false, reason: "Invalid PDF format" };
+    }
+  } else if (fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    // DOCX files are ZIP archives containing XML
+    if (!content.includes("PK") && !content.includes("<?xml")) {
+      return { valid: false, reason: "Invalid DOCX format" };
+    }
+  } else if (fileType === "text/plain" || fileType === "text/csv") {
+    // Text files should not contain binary content
+    const binaryPattern = /[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F-\xFF]{10,}/;
+    if (binaryPattern.test(content)) {
+      return { valid: false, reason: "Text file contains binary content" };
+    }
+  } else {
+    return { valid: false, reason: "Unsupported file type" };
+  }
+
+  return { valid: true };
+};
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -56,6 +98,44 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
+
+    // Get document to verify ownership and file type
+    const { data: document, error: docFetchError } = await supabase
+      .from("documents")
+      .select("file_type, user_id")
+      .eq("id", documentId)
+      .single();
+
+    if (docFetchError || !document) {
+      console.error("Document not found or unauthorized");
+      return new Response(
+        JSON.stringify({ error: "Document not found" }),
+        {
+          status: 404,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Validate content type matches file type
+    const contentValidation = validateContentType(content, document.file_type);
+    if (!contentValidation.valid) {
+      console.error("Content validation failed:", contentValidation.reason);
+      
+      // Update document status to failed
+      await supabase
+        .from("documents")
+        .update({ status: "failed" })
+        .eq("id", documentId);
+
+      return new Response(
+        JSON.stringify({ error: contentValidation.reason || "Invalid file content" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     // Prepare AI prompt for document analysis
     const analysisPrompt = `Analyze the following document and provide:

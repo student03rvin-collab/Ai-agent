@@ -15,28 +15,91 @@ const DocumentUpload = ({ userId, onUploadComplete }: DocumentUploadProps) => {
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // File signature validation (magic numbers)
+  const validateFileSignature = async (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const arr = new Uint8Array(e.target?.result as ArrayBuffer).subarray(0, 8);
+        let header = "";
+        for (let i = 0; i < arr.length; i++) {
+          header += arr[i].toString(16).padStart(2, "0");
+        }
+
+        // File signatures (magic numbers)
+        const signatures: { [key: string]: string[] } = {
+          pdf: ["25504446"], // %PDF
+          docx: ["504b0304", "504b0506", "504b0708"], // PK (ZIP-based)
+          txt: [], // Plain text has no signature
+          csv: [], // CSV has no signature
+        };
+
+        const extension = file.name.split(".").pop()?.toLowerCase() || "";
+        
+        // Allow text and CSV without signature check
+        if (extension === "txt" || extension === "csv") {
+          resolve(true);
+          return;
+        }
+
+        // Check if file signature matches expected type
+        const expectedSignatures = signatures[extension] || [];
+        const isValid = expectedSignatures.some((sig) => header.startsWith(sig));
+        
+        resolve(isValid);
+      };
+      reader.onerror = () => resolve(false);
+      reader.readAsArrayBuffer(file.slice(0, 8));
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      const validTypes = [
-        "application/pdf",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        "text/plain",
-        "text/csv",
-      ];
+    if (!selectedFile) return;
 
-      if (!validTypes.includes(selectedFile.type)) {
-        toast.error("Please upload a PDF, DOCX, TXT, or CSV file");
-        return;
-      }
-
-      if (selectedFile.size > 10 * 1024 * 1024) {
-        toast.error("File size must be less than 10MB");
-        return;
-      }
-
-      setFile(selectedFile);
+    // Validate file extension
+    const allowedExtensions = ["pdf", "docx", "txt", "csv"];
+    const extension = selectedFile.name.split(".").pop()?.toLowerCase() || "";
+    
+    if (!allowedExtensions.includes(extension)) {
+      toast.error("Invalid file type. Only PDF, DOCX, TXT, and CSV files are allowed");
+      e.target.value = "";
+      return;
     }
+
+    // Validate MIME type
+    const validTypes = [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "text/plain",
+      "text/csv",
+      "application/octet-stream", // Some systems report DOCX as this
+    ];
+
+    if (!validTypes.includes(selectedFile.type)) {
+      toast.error("Invalid file type detected. Please upload a valid document");
+      e.target.value = "";
+      return;
+    }
+
+    // Validate file size
+    if (selectedFile.size > 10 * 1024 * 1024) {
+      toast.error("File size must be less than 10MB");
+      e.target.value = "";
+      return;
+    }
+
+    // Validate file signature for binary files
+    if (extension === "pdf" || extension === "docx") {
+      const isValidSignature = await validateFileSignature(selectedFile);
+      if (!isValidSignature) {
+        toast.error("File appears to be corrupted or is not a valid " + extension.toUpperCase() + " file");
+        e.target.value = "";
+        return;
+      }
+    }
+
+    setFile(selectedFile);
   };
 
   const handleUpload = async () => {
