@@ -19,7 +19,15 @@ const Index = () => {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      navigate("/chat");
+      navigate("/general-chat");
+    } else {
+      navigate("/auth");
+    }
+  };
+
+  const handleDocumentChat = () => {
+    if (isAuthenticated) {
+      navigate("/document-chat");
     } else {
       navigate("/auth");
     }
@@ -59,20 +67,34 @@ const Index = () => {
               className="bg-primary hover:bg-primary/90 text-lg px-8 py-6 relative overflow-hidden group"
             >
               <span className="relative z-10 flex items-center gap-2">
-                <Rocket className="w-5 h-5" />
-                Get Started Free
+                <MessageSquare className="w-5 h-5" />
+                Start General Chat
               </span>
               <div className="absolute inset-0 bg-gradient-ai opacity-0 group-hover:opacity-20 transition-opacity" />
             </Button>
 
             <Button
               size="lg"
-              variant="outline"
-              onClick={() => navigate("/auth")}
-              className="text-lg px-8 py-6 border-primary/30 hover:border-primary"
+              onClick={handleDocumentChat}
+              className="bg-accent hover:bg-accent/90 text-lg px-8 py-6 relative overflow-hidden group"
             >
-              Sign In
+              <span className="relative z-10 flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Analyze Documents
+              </span>
+              <div className="absolute inset-0 bg-gradient-ai opacity-0 group-hover:opacity-20 transition-opacity" />
             </Button>
+
+            {!isAuthenticated && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/auth")}
+                className="text-lg px-8 py-6 border-primary/30 hover:border-primary"
+              >
+                Sign In
+              </Button>
+            )}
           </div>
         </div>
       </section>

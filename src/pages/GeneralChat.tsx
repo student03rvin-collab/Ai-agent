@@ -3,18 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut, Upload, FileText, MessageSquare, Home } from "lucide-react";
+import { Brain, LogOut, Home, FileText } from "lucide-react";
 import { toast } from "sonner";
 import ChatInterface from "@/components/chat/ChatInterface";
-import DocumentUpload from "@/components/document/DocumentUpload";
-import DocumentList from "@/components/document/DocumentList";
-import { Card } from "@/components/ui/card";
 
-const Chat = () => {
+const GeneralChat = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeView, setActiveView] = useState<"chat" | "documents" | "upload">("chat");
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -49,11 +44,6 @@ const Chat = () => {
     navigate("/auth");
   };
 
-  const handleDocumentSelect = (documentId: string) => {
-    setSelectedDocumentId(documentId);
-    setActiveView("chat");
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -78,7 +68,7 @@ const Chat = () => {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Brain className="w-8 h-8 text-primary" />
-            <h1 className="text-2xl font-bold gradient-text">Document Chat</h1>
+            <h1 className="text-2xl font-bold gradient-text">General Chat</h1>
           </div>
 
           <div className="flex items-center gap-2">
@@ -93,37 +83,10 @@ const Chat = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate("/general-chat")}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              General Chat
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView("chat")}
-              className={activeView === "chat" ? "bg-primary/20" : ""}
-            >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Chat
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView("documents")}
-              className={activeView === "documents" ? "bg-primary/20" : ""}
+              onClick={() => navigate("/document-chat")}
             >
               <FileText className="w-4 h-4 mr-2" />
-              Documents
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setActiveView("upload")}
-              className={activeView === "upload" ? "bg-primary/20" : ""}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload
+              Document Chat
             </Button>
             <Button
               variant="ghost"
@@ -139,36 +102,7 @@ const Chat = () => {
 
       {/* Main content */}
       <main className="flex-1 container mx-auto px-4 py-8 relative z-10">
-        {activeView === "chat" && (
-          <ChatInterface userId={user!.id} documentId={selectedDocumentId} />
-        )}
-
-        {activeView === "documents" && (
-          <div className="max-w-4xl mx-auto animate-slide-up">
-            <Card className="glass border-primary/20 p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <FileText className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-bold">Your Documents</h2>
-              </div>
-              <DocumentList onSelectDocument={handleDocumentSelect} />
-            </Card>
-          </div>
-        )}
-
-        {activeView === "upload" && (
-          <div className="max-w-2xl mx-auto animate-slide-up">
-            <Card className="glass border-primary/20 p-8">
-              <div className="flex items-center gap-3 mb-6">
-                <Upload className="w-6 h-6 text-primary" />
-                <h2 className="text-2xl font-bold">Upload Document</h2>
-              </div>
-              <DocumentUpload 
-                userId={user!.id} 
-                onUploadComplete={() => setActiveView("documents")}
-              />
-            </Card>
-          </div>
-        )}
+        <ChatInterface userId={user!.id} documentId={null} />
       </main>
 
       {/* Footer */}
@@ -181,4 +115,4 @@ const Chat = () => {
   );
 };
 
-export default Chat;
+export default GeneralChat;
