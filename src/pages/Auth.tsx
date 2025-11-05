@@ -7,6 +7,17 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Brain, Sparkles, Lock, Mail } from "lucide-react";
+import { z } from "zod";
+
+// Input validation schemas
+const emailSchema = z.string().email("Invalid email address").max(255, "Email too long");
+const passwordSchema = z.string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password too long")
+  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
+  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
+  .regex(/[0-9]/, "Password must contain at least one number");
+const nameSchema = z.string().min(1, "Name cannot be empty").max(100, "Name too long");
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,10 +32,36 @@ const Auth = () => {
     setLoading(true);
 
     try {
+      // Validate email
+      const emailValidation = emailSchema.safeParse(email);
+      if (!emailValidation.success) {
+        toast.error(emailValidation.error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+
+      // Validate password
+      const passwordValidation = passwordSchema.safeParse(password);
+      if (!passwordValidation.success) {
+        toast.error(passwordValidation.error.errors[0].message);
+        setLoading(false);
+        return;
+      }
+
+      // Validate full name for signup
+      if (!isLogin) {
+        const nameValidation = nameSchema.safeParse(fullName);
+        if (!nameValidation.success) {
+          toast.error(nameValidation.error.errors[0].message);
+          setLoading(false);
+          return;
+        }
+      }
+
       if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: emailValidation.data,
+          password: passwordValidation.data,
         });
 
         if (error) throw error;
@@ -35,8 +72,8 @@ const Auth = () => {
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
+          email: emailValidation.data,
+          password: passwordValidation.data,
           options: {
             data: {
               full_name: fullName,
@@ -96,6 +133,7 @@ const Auth = () => {
                   placeholder="John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
+                  maxLength={100}
                   required
                   className="bg-background/50 border-primary/20 focus:border-primary"
                 />
@@ -113,6 +151,7 @@ const Auth = () => {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                maxLength={255}
                 required
                 className="bg-background/50 border-primary/20 focus:border-primary"
               />
@@ -129,10 +168,16 @@ const Auth = () => {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                maxLength={128}
                 required
-                minLength={6}
                 className="bg-background/50 border-primary/20 focus:border-primary"
               />
+              {!isLogin && (
+                <p className="text-xs text-muted-foreground">
+                  Must be 8+ characters with uppercase, lowercase, and number
+                </p>
+              )}
             </div>
 
             <Button

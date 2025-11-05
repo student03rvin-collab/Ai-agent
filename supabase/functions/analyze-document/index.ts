@@ -1,9 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
+
+// Input validation schema
+const analyzeRequestSchema = z.object({
+  documentId: z.string().uuid("Invalid document ID"),
+  content: z.string().min(1, "Content cannot be empty").max(10 * 1024 * 1024, "Content exceeds 10MB limit"),
+});
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -11,14 +18,44 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { documentId, content } = await req.json();
+    // Check authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("Missing authorization header");
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // Parse and validate request body
+    const body = await req.json();
+    const validationResult = analyzeRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error("Validation failed:", validationResult.error);
+      return new Response(
+        JSON.stringify({ error: "Invalid request parameters" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const { documentId, content } = validationResult.data;
 
     console.log("Analyzing document:", documentId);
 
-    // Initialize Supabase client
+    // Initialize Supabase client with user's JWT (enforces RLS)
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
 
     // Prepare AI prompt for document analysis
     const analysisPrompt = `Analyze the following document and provide:
