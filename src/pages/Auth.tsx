@@ -7,17 +7,29 @@ import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Brain, Sparkles, Lock, Mail } from "lucide-react";
-import { z } from "zod";
 
-// Input validation schemas
-const emailSchema = z.string().email("Invalid email address").max(255, "Email too long");
-const passwordSchema = z.string()
-  .min(8, "Password must be at least 8 characters")
-  .max(128, "Password too long")
-  .regex(/[A-Z]/, "Password must contain at least one uppercase letter")
-  .regex(/[a-z]/, "Password must contain at least one lowercase letter")
-  .regex(/[0-9]/, "Password must contain at least one number");
-const nameSchema = z.string().min(1, "Name cannot be empty").max(100, "Name too long");
+// Validation functions
+const validateEmail = (email: string): string | null => {
+  if (!email || email.length > 255) return "Invalid email address";
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) return "Invalid email address";
+  return null;
+};
+
+const validatePassword = (password: string): string | null => {
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (password.length > 128) return "Password too long";
+  if (!/[A-Z]/.test(password)) return "Password must contain an uppercase letter";
+  if (!/[a-z]/.test(password)) return "Password must contain a lowercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain a number";
+  return null;
+};
+
+const validateName = (name: string): string | null => {
+  if (!name || name.length === 0) return "Name cannot be empty";
+  if (name.length > 100) return "Name too long";
+  return null;
+};
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -33,26 +45,26 @@ const Auth = () => {
 
     try {
       // Validate email
-      const emailValidation = emailSchema.safeParse(email);
-      if (!emailValidation.success) {
-        toast.error(emailValidation.error.errors[0].message);
+      const emailError = validateEmail(email);
+      if (emailError) {
+        toast.error(emailError);
         setLoading(false);
         return;
       }
 
       // Validate password
-      const passwordValidation = passwordSchema.safeParse(password);
-      if (!passwordValidation.success) {
-        toast.error(passwordValidation.error.errors[0].message);
+      const passwordError = validatePassword(password);
+      if (passwordError) {
+        toast.error(passwordError);
         setLoading(false);
         return;
       }
 
       // Validate full name for signup
       if (!isLogin) {
-        const nameValidation = nameSchema.safeParse(fullName);
-        if (!nameValidation.success) {
-          toast.error(nameValidation.error.errors[0].message);
+        const nameError = validateName(fullName);
+        if (nameError) {
+          toast.error(nameError);
           setLoading(false);
           return;
         }
@@ -60,8 +72,8 @@ const Auth = () => {
 
       if (isLogin) {
         const { data, error } = await supabase.auth.signInWithPassword({
-          email: emailValidation.data,
-          password: passwordValidation.data,
+          email,
+          password,
         });
 
         if (error) throw error;
@@ -72,8 +84,8 @@ const Auth = () => {
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
-          email: emailValidation.data,
-          password: passwordValidation.data,
+          email,
+          password,
           options: {
             data: {
               full_name: fullName,
