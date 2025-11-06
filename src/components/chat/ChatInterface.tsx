@@ -16,28 +16,62 @@ interface Message {
 interface ChatInterfaceProps {
   userId: string;
   documentId: string | null;
+  conversationId?: string | null;
+  onConversationCreated?: (conversationId: string) => void;
 }
 
-const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
+const ChatInterface = ({ 
+  userId, 
+  documentId, 
+  conversationId: externalConversationId,
+  onConversationCreated 
+}: ChatInterfaceProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<string | null>(externalConversationId || null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    initializeConversation();
-  }, [documentId]);
+    if (externalConversationId) {
+      loadExistingConversation(externalConversationId);
+    } else {
+      initializeConversation();
+    }
+  }, [documentId, externalConversationId]);
+
+  const loadExistingConversation = async (convId: string) => {
+    try {
+      setConversationId(convId);
+
+      const { data: existingMessages, error: messagesError } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("conversation_id", convId)
+        .order("created_at", { ascending: true });
+
+      if (messagesError) {
+        console.error("Failed to load conversation history");
+        toast.error("Unable to load chat history. Please refresh the page.");
+        return;
+      }
+
+      setMessages((existingMessages || []) as Message[]);
+    } catch (error: any) {
+      console.error("Failed to load conversation");
+      toast.error("Unable to load conversation. Please try again.");
+    }
+  };
 
   const initializeConversation = async () => {
     try {
-      // Create or get conversation
+      // Create new conversation
       const { data: conversation, error: convError } = await supabase
         .from("conversations")
         .insert({
           user_id: userId,
           document_id: documentId,
-          title: documentId ? "Document Chat" : "General Chat",
+          title: documentId ? "Document Chat" : "New Chat",
         })
         .select()
         .single();
@@ -49,21 +83,8 @@ const ChatInterface = ({ userId, documentId }: ChatInterfaceProps) => {
       }
 
       setConversationId(conversation.id);
-
-      // Load existing messages
-      const { data: existingMessages, error: messagesError } = await supabase
-        .from("messages")
-        .select("*")
-        .eq("conversation_id", conversation.id)
-        .order("created_at", { ascending: true });
-
-      if (messagesError) {
-        console.error("Failed to load conversation history");
-        toast.error("Unable to load chat history. Please refresh the page.");
-        return;
-      }
-
-      setMessages((existingMessages || []) as Message[]);
+      onConversationCreated?.(conversation.id);
+      setMessages([]);
     } catch (error: any) {
       console.error("Conversation initialization failed");
       toast.error("Unable to start chat session. Please refresh the page.");

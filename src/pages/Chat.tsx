@@ -3,11 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut, Upload, FileText, MessageSquare, Home } from "lucide-react";
+import { Brain, LogOut, Upload, FileText, MessageSquare, Home, Plus } from "lucide-react";
 import { toast } from "sonner";
 import ChatInterface from "@/components/chat/ChatInterface";
 import DocumentUpload from "@/components/document/DocumentUpload";
 import DocumentList from "@/components/document/DocumentList";
+import ConversationHistory from "@/components/chat/ConversationHistory";
 import { Card } from "@/components/ui/card";
 
 const Chat = () => {
@@ -15,6 +16,7 @@ const Chat = () => {
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<"chat" | "documents" | "upload">("chat");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -51,7 +53,23 @@ const Chat = () => {
 
   const handleDocumentSelect = (documentId: string) => {
     setSelectedDocumentId(documentId);
+    setSelectedConversationId(null);
     setActiveView("chat");
+  };
+
+  const handleNewChat = () => {
+    setSelectedConversationId(null);
+    setSelectedDocumentId(null);
+  };
+
+  const handleSelectConversation = (conversationId: string, documentId: string | null) => {
+    if (!documentId) {
+      navigate("/general-chat");
+    } else {
+      setSelectedConversationId(conversationId);
+      setSelectedDocumentId(documentId);
+      setActiveView("chat");
+    }
   };
 
   if (loading) {
@@ -140,7 +158,32 @@ const Chat = () => {
       {/* Main content */}
       <main className="flex-1 container mx-auto px-4 py-8 relative z-10">
         {activeView === "chat" && (
-          <ChatInterface userId={user!.id} documentId={selectedDocumentId} />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+            <div className="lg:col-span-1">
+              <div className="mb-4">
+                <Button
+                  onClick={handleNewChat}
+                  className="w-full bg-primary hover:bg-primary/90"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  New Chat
+                </Button>
+              </div>
+              <ConversationHistory
+                userId={user!.id}
+                onSelectConversation={handleSelectConversation}
+                currentConversationId={selectedConversationId}
+              />
+            </div>
+            <div className="lg:col-span-3">
+              <ChatInterface 
+                userId={user!.id} 
+                documentId={selectedDocumentId}
+                conversationId={selectedConversationId}
+                onConversationCreated={setSelectedConversationId}
+              />
+            </div>
+          </div>
         )}
 
         {activeView === "documents" && (

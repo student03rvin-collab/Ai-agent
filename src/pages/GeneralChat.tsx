@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut, Home, FileText } from "lucide-react";
+import { Brain, LogOut, Home, FileText, Plus } from "lucide-react";
 import { toast } from "sonner";
 import ChatInterface from "@/components/chat/ChatInterface";
+import ConversationHistory from "@/components/chat/ConversationHistory";
 
 const GeneralChat = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,6 +44,18 @@ const GeneralChat = () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
     navigate("/auth");
+  };
+
+  const handleNewChat = () => {
+    setSelectedConversationId(null);
+  };
+
+  const handleSelectConversation = (conversationId: string, documentId: string | null) => {
+    if (documentId) {
+      navigate("/document-chat");
+    } else {
+      setSelectedConversationId(conversationId);
+    }
   };
 
   if (loading) {
@@ -102,7 +116,32 @@ const GeneralChat = () => {
 
       {/* Main content */}
       <main className="flex-1 container mx-auto px-4 py-8 relative z-10">
-        <ChatInterface userId={user!.id} documentId={null} />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+          <div className="lg:col-span-1">
+            <div className="mb-4">
+              <Button
+                onClick={handleNewChat}
+                className="w-full bg-primary hover:bg-primary/90"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Chat
+              </Button>
+            </div>
+            <ConversationHistory
+              userId={user!.id}
+              onSelectConversation={handleSelectConversation}
+              currentConversationId={selectedConversationId}
+            />
+          </div>
+          <div className="lg:col-span-3">
+            <ChatInterface 
+              userId={user!.id} 
+              documentId={null}
+              conversationId={selectedConversationId}
+              onConversationCreated={setSelectedConversationId}
+            />
+          </div>
+        </div>
       </main>
 
       {/* Footer */}
