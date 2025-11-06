@@ -32,7 +32,7 @@ function checkRateLimit(userId: string): boolean {
 const chatRequestSchema = z.object({
   message: z.string().min(1, "Message cannot be empty").max(5000, "Message too long"),
   conversationId: z.string().uuid("Invalid conversation ID"),
-  documentId: z.string().uuid("Invalid document ID").optional(),
+  documentId: z.string().uuid("Invalid document ID").nullable().optional(),
 });
 
 Deno.serve(async (req) => {
