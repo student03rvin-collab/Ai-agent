@@ -24,7 +24,7 @@ const Chat = () => {
       const { data: { user } } = await supabase.auth.getUser();
       
       if (!user) {
-        navigate("/auth");
+        navigate("/");
         return;
       }
 
@@ -36,7 +36,7 @@ const Chat = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!session?.user) {
-        navigate("/auth");
+        navigate("/");
       } else {
         setUser(session.user);
       }
@@ -48,7 +48,7 @@ const Chat = () => {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     toast.success("Signed out successfully");
-    navigate("/auth");
+    navigate("/");
   };
 
   const handleDocumentSelect = (documentId: string) => {
@@ -100,14 +100,6 @@ const Chat = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/")}
-            >
-              <Home className="w-4 h-4 mr-2" />
-              Home
-            </Button>
             <Button
               variant="ghost"
               size="sm"

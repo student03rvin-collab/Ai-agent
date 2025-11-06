@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -40,13 +40,24 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkAuth = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        navigate("/general-chat");
+      }
+    };
+    checkAuth();
+  }, [navigate]);
+
   const handleGoogleAuth = async () => {
     try {
       setLoading(true);
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/general-chat`,
         },
       });
 
@@ -99,7 +110,7 @@ const Auth = () => {
 
         if (data.user) {
           toast.success("Welcome back!");
-          navigate("/");
+          navigate("/general-chat");
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -109,7 +120,7 @@ const Auth = () => {
             data: {
               full_name: fullName,
             },
-            emailRedirectTo: `${window.location.origin}/`,
+            emailRedirectTo: `${window.location.origin}/general-chat`,
           },
         });
 
@@ -117,7 +128,7 @@ const Auth = () => {
 
         if (data.user) {
           toast.success("Account created! Redirecting...");
-          navigate("/");
+          navigate("/general-chat");
         }
       }
     } catch (error: any) {
