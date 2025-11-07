@@ -3,9 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, FileText, Clock, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MessageSquare, FileText, Clock, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, isAfter, subDays } from "date-fns";
 
 interface Conversation {
   id: string;
@@ -28,6 +30,8 @@ const ConversationHistory = ({
 }: ConversationHistoryProps) => {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
 
   useEffect(() => {
     loadConversations();
@@ -72,6 +76,33 @@ const ConversationHistory = ({
     }
   };
 
+  const filteredConversations = conversations.filter((conv) => {
+    // Search filter
+    const matchesSearch = conv.title.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    // Date filter
+    let matchesDate = true;
+    const convDate = new Date(conv.updated_at);
+    const now = new Date();
+    
+    switch (dateFilter) {
+      case "today":
+        matchesDate = isAfter(convDate, subDays(now, 1));
+        break;
+      case "week":
+        matchesDate = isAfter(convDate, subDays(now, 7));
+        break;
+      case "month":
+        matchesDate = isAfter(convDate, subDays(now, 30));
+        break;
+      case "all":
+      default:
+        matchesDate = true;
+    }
+    
+    return matchesSearch && matchesDate;
+  });
+
   if (loading) {
     return (
       <Card className="glass border-primary/20 p-4">
@@ -82,20 +113,42 @@ const ConversationHistory = ({
 
   return (
     <Card className="glass border-primary/20">
-      <div className="p-4 border-b border-primary/20">
+      <div className="p-4 border-b border-primary/20 space-y-3">
         <h3 className="font-semibold flex items-center gap-2">
           <Clock className="w-4 h-4 text-primary" />
           Recent Conversations
         </h3>
+        <div className="space-y-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={dateFilter} onValueChange={setDateFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="Filter by date" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All time</SelectItem>
+              <SelectItem value="today">Today</SelectItem>
+              <SelectItem value="week">Last 7 days</SelectItem>
+              <SelectItem value="month">Last 30 days</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
-      <ScrollArea className="h-[calc(100vh-20rem)]">
+      <ScrollArea className="h-[calc(100vh-24rem)]">
         <div className="p-2 space-y-2">
-          {conversations.length === 0 ? (
+          {filteredConversations.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-8">
-              No conversations yet
+              {conversations.length === 0 ? "No conversations yet" : "No conversations match your filters"}
             </p>
           ) : (
-            conversations.map((conv) => (
+            filteredConversations.map((conv) => (
               <Button
                 key={conv.id}
                 variant={currentConversationId === conv.id ? "secondary" : "ghost"}
