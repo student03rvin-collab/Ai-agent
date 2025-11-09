@@ -48,7 +48,7 @@ const Auth = () => {
     const checkAuth = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        navigate("/general-chat");
+        navigate("/home");
       }
     };
     checkAuth();
@@ -60,7 +60,7 @@ const Auth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/general-chat`,
+          redirectTo: `${window.location.origin}/home`,
         },
       });
 
@@ -113,7 +113,7 @@ const Auth = () => {
 
         if (data.user) {
           toast.success("Welcome back!");
-          navigate("/general-chat");
+          navigate("/home");
         }
       } else {
         const { data, error } = await supabase.auth.signUp({
@@ -123,7 +123,7 @@ const Auth = () => {
             data: {
               full_name: fullName,
             },
-            emailRedirectTo: `${window.location.origin}/general-chat`,
+            emailRedirectTo: `${window.location.origin}/home`,
           },
         });
 
@@ -131,7 +131,7 @@ const Auth = () => {
 
         if (data.user) {
           toast.success("Account created! Redirecting...");
-          navigate("/general-chat");
+          navigate("/home");
         }
       }
     } catch (error: any) {

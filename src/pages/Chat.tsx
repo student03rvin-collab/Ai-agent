@@ -103,6 +103,14 @@ const Chat = () => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => navigate("/home")}
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => navigate("/general-chat")}
             >
               <MessageSquare className="w-4 h-4 mr-2" />

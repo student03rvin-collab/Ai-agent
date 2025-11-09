@@ -89,6 +89,14 @@ const GeneralChat = () => {
             <Button
               variant="ghost"
               size="sm"
+              onClick={() => navigate("/home")}
+            >
+              <Home className="w-4 h-4 mr-2" />
+              Home
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => navigate("/document-chat")}
             >
               <FileText className="w-4 h-4 mr-2" />
