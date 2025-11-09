@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
-import { Brain, LogOut, Home, FileText, Plus } from "lucide-react";
+import { Brain, LogOut, Home, FileText, Plus, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 import ChatInterface from "@/components/chat/ChatInterface";
 import ConversationHistory from "@/components/chat/ConversationHistory";
@@ -101,6 +101,14 @@ const GeneralChat = () => {
             >
               <FileText className="w-4 h-4 mr-2" />
               Document Chat
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/profile")}
+            >
+              <UserIcon className="w-4 h-4 mr-2" />
+              Profile
             </Button>
             <Button
               variant="ghost"

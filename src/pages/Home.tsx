@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Brain, FileText, MessageSquare, LogOut } from "lucide-react";
+import { Brain, FileText, MessageSquare, LogOut, User as UserIcon } from "lucide-react";
 import { toast } from "sonner";
 
 const Home = () => {
@@ -71,15 +71,25 @@ const Home = () => {
             <h1 className="text-2xl font-bold gradient-text">AI Document Assistant</h1>
           </div>
 
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            className="text-muted-foreground hover:text-destructive"
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/profile")}
+            >
+              <UserIcon className="w-4 h-4 mr-2" />
+              Profile
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleSignOut}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
