@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Brain, User as UserIcon, Lock, Mail, Calendar, Save, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import TwoFactorSetup from "@/components/auth/TwoFactorSetup";
 
 // Validation functions
 const validateName = (name: string): string | null => {
@@ -423,6 +424,9 @@ const Profile = () => {
               </p>
             )}
           </Card>
+
+          {/* Two-Factor Authentication Card */}
+          <TwoFactorSetup userId={user!.id} />
         </div>
       </main>
 

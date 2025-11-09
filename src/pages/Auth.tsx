@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { toast } from "sonner";
 import { Brain, Sparkles, Lock, Mail } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import MfaVerification from "@/components/auth/MfaVerification";
 
 // Validation functions
 const validateEmail = (email: string): string | null => {
@@ -41,6 +42,8 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [requiresMfa, setRequiresMfa] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -111,7 +114,25 @@ const Auth = () => {
 
         if (error) throw error;
 
+        // Check if MFA is required
         if (data.user) {
+          const { data: factors } = await supabase.auth.mfa.listFactors();
+          const totpFactor = factors?.totp?.find((factor) => factor.status === 'verified');
+          
+          if (totpFactor) {
+            // Challenge the factor
+            const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+              factorId: totpFactor.id,
+            });
+            
+            if (challengeError) throw challengeError;
+            
+            setMfaFactorId(totpFactor.id);
+            setRequiresMfa(true);
+            setLoading(false);
+            return;
+          }
+          
           toast.success("Welcome back!");
           navigate("/home");
         }
@@ -171,6 +192,41 @@ const Auth = () => {
       setLoading(false);
     }
   };
+
+  const handleMfaSuccess = () => {
+    toast.success("Welcome back!");
+    setRequiresMfa(false);
+    navigate("/home");
+  };
+
+  const handleMfaCancel = () => {
+    setRequiresMfa(false);
+    setMfaFactorId("");
+    toast.info("Login cancelled");
+  };
+
+  if (requiresMfa) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Animated background orbs */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-20 left-20 w-72 h-72 bg-primary/20 rounded-full blur-3xl animate-pulse-glow" />
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: "1s" }} />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-secondary/10 rounded-full blur-3xl animate-pulse-glow" style={{ animationDelay: "2s" }} />
+        </div>
+
+        <Card className="w-full max-w-md relative glass border-primary/20 animate-slide-up">
+          <div className="p-8">
+            <MfaVerification
+              factorId={mfaFactorId}
+              onSuccess={handleMfaSuccess}
+              onCancel={handleMfaCancel}
+            />
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
