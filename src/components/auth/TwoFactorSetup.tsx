@@ -93,11 +93,27 @@ const TwoFactorSetup = ({ userId }: TwoFactorSetupProps) => {
 
       toast.success("2FA enabled successfully!");
       
-      // Show recovery codes (in production, these should be generated and stored securely)
-      const mockRecoveryCodes = Array.from({ length: 8 }, () => 
-        Math.random().toString(36).substring(2, 10).toUpperCase()
-      );
-      setRecoveryCodes(mockRecoveryCodes);
+      // Generate secure recovery codes via edge function
+      try {
+        const { data: codesData, error: codesError } = await supabase.functions.invoke(
+          'generate-recovery-codes',
+          {
+            headers: {
+              Authorization: `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            },
+          }
+        );
+
+        if (codesError) {
+          console.error("Error generating recovery codes:", codesError);
+          toast.error("Failed to generate recovery codes. Please contact support.");
+        } else if (codesData?.recovery_codes) {
+          setRecoveryCodes(codesData.recovery_codes);
+        }
+      } catch (error) {
+        console.error("Error calling recovery codes function:", error);
+        toast.error("Failed to generate recovery codes. Please contact support.");
+      }
       
       setMfaEnabled(true);
       setEnrolling(false);
