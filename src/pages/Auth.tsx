@@ -42,6 +42,8 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resendEmail, setResendEmail] = useState("");
+  const [resendDialogOpen, setResendDialogOpen] = useState(false);
   const [requiresMfa, setRequiresMfa] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState("");
   const navigate = useNavigate();
@@ -205,6 +207,40 @@ const Auth = () => {
     toast.info("Login cancelled");
   };
 
+  const handleResendVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    try {
+      // Validate email
+      const emailError = validateEmail(resendEmail);
+      if (emailError) {
+        toast.error(emailError);
+        setLoading(false);
+        return;
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: resendEmail,
+        options: {
+          emailRedirectTo: `${window.location.origin}/home`,
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success("Verification email sent! Check your inbox.");
+      setResendDialogOpen(false);
+      setResendEmail("");
+    } catch (error: any) {
+      console.error("Resend verification error");
+      toast.error("Failed to send verification email. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (requiresMfa) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
@@ -312,7 +348,51 @@ const Auth = () => {
             </div>
 
             {isLogin && (
-              <div className="flex justify-end">
+              <div className="flex justify-between items-center">
+                <Dialog open={resendDialogOpen} onOpenChange={setResendDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-sm text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      Resend verification email
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="glass border-primary/20">
+                    <DialogHeader>
+                      <DialogTitle className="gradient-text">Resend Verification</DialogTitle>
+                      <DialogDescription>
+                        Enter your email address and we'll send you a new verification email.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleResendVerification} className="space-y-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="resendEmail" className="flex items-center gap-2">
+                          <Mail className="w-4 h-4 text-primary" />
+                          Email
+                        </Label>
+                        <Input
+                          id="resendEmail"
+                          type="email"
+                          placeholder="you@example.com"
+                          value={resendEmail}
+                          onChange={(e) => setResendEmail(e.target.value)}
+                          maxLength={255}
+                          required
+                          className="bg-background/50 border-primary/20 focus:border-primary"
+                        />
+                      </div>
+                      <Button
+                        type="submit"
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        disabled={loading}
+                      >
+                        {loading ? "Sending..." : "Resend Verification"}
+                      </Button>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+                
                 <Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
                   <DialogTrigger asChild>
                     <button
